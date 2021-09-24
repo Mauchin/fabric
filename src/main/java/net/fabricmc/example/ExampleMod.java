@@ -1,6 +1,8 @@
 package net.fabricmc.example;
 
 import net.fabricmc.api.ModInitializer;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.stat.Stats;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -17,5 +19,6 @@ public class ExampleMod implements ModInitializer {
 		// Proceed with mild caution.
 
 		LOGGER.info("Hello Fabric world!");
+
 	}
 }
