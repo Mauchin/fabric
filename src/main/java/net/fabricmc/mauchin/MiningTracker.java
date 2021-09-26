@@ -12,6 +12,7 @@ import org.apache.logging.log4j.Logger;
 import org.lwjgl.glfw.GLFW;
 
 import java.text.DecimalFormat;
+import java.util.Objects;
 
 
 public class MiningTracker implements ClientModInitializer {
@@ -32,6 +33,13 @@ public class MiningTracker implements ClientModInitializer {
     private int timer = 0;
     private String speed_color = "\247c";
     private int money_per_hour = 0;
+    private int time_no_click_detect = 0;
+    private int efficiency_level = 0;
+    private boolean breaker_enabled = false;
+    private final int breaker_length = 440;
+    private final int breaker_cd = 2400;
+    private int breaker_time = 0;
+    private String breaker_color = "\247b";
 
 
     @Override
@@ -104,6 +112,9 @@ public class MiningTracker implements ClientModInitializer {
             if (time_no_display > 0) {
                 time_no_display -= 1;
             }
+            if (time_no_click_detect > 0) {
+                time_no_click_detect -= 1;
+            }
             current_dia_count = 0;
             if (ticking) {
                 for (int i = 0; i < 36; i++) {
@@ -113,8 +124,40 @@ public class MiningTracker implements ClientModInitializer {
                 }
             }
 
-            if (client.player != null && client.mouse.wasRightButtonClicked() && time_no_display <= 0) {
+            if (client.player != null && client.mouse.wasRightButtonClicked() && time_no_click_detect <= 0) {
                 time_no_display = 20;
+                time_no_click_detect =40;
+
+            }
+            efficiency_level = 0;
+            for (int j = 0; j < 10; j++) {
+                if (client.player != null && efficiency_level == 0 && Objects.equals(client.player.getMainHandStack().getEnchantments().getCompound(j).getString("id"), "minecraft:efficiency")
+                    && (client.player.getMainHandStack().getItem() == Items.NETHERITE_PICKAXE||
+                        client.player.getMainHandStack().getItem() == Items.DIAMOND_PICKAXE||
+                        client.player.getMainHandStack().getItem() == Items.IRON_PICKAXE||
+                        client.player.getMainHandStack().getItem() == Items.STONE_PICKAXE||
+                        client.player.getMainHandStack().getItem() == Items.GOLDEN_PICKAXE||
+                        client.player.getMainHandStack().getItem() == Items.WOODEN_PICKAXE)) {
+                    efficiency_level = client.player.getMainHandStack().getEnchantments().getCompound(j).getInt("lvl");
+                }
+            }
+            if (efficiency_level >= 10){
+                if (!breaker_enabled){
+                    breaker_time = breaker_length;
+                }
+                breaker_enabled = true;
+                breaker_color = "\247b\247l";
+
+            }
+            else if (breaker_enabled && breaker_time <= 0){
+                breaker_enabled = false;
+                breaker_time = breaker_cd;
+            }
+            if (!breaker_enabled){
+                breaker_color = "\247f";
+            }
+            if (breaker_time > 0){
+                breaker_time -= 1;
             }
 
             dia_per_minute_modded = 0;
@@ -145,7 +188,12 @@ public class MiningTracker implements ClientModInitializer {
                 current_dia_count = start_dia_count;
             }
             if (client.player != null && show_count && time_no_display <= 0 && timer % 10 == 0) {
-                client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ \247b⛏ " + (current_dia_count - start_dia_count)), true);
+                if (breaker_time == 0 && !breaker_enabled){
+                    client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│\247e ⚡ READY \247"+marker_color+"│ \247b⛏ " + (current_dia_count - start_dia_count)), true);
+                }
+                else{
+                client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ "+breaker_color+"⚡ "+(breaker_time/20 + 1)+"s \247"+marker_color+"│ \247b⛏ " + (current_dia_count - start_dia_count)), true);
+                }
             }
 
 
