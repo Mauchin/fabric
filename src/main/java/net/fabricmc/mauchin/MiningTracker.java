@@ -3,13 +3,20 @@ package net.fabricmc.mauchin;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.mixin.client.rendering.MixinInGameHud;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawableHelper;
+import net.minecraft.client.gui.hud.InGameHud;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.LiteralText;
+import net.minecraft.util.math.Matrix4f;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.glfw.GLFW;
+
 
 import java.text.DecimalFormat;
 import java.util.Objects;
@@ -37,11 +44,13 @@ public class MiningTracker implements ClientModInitializer {
     private int efficiency_level = 0;
     private boolean breaker_enabled = false;
     private final int breaker_length = 440;
-    private final int breaker_cd = 2400;
+    private final int breaker_cd = 2380;
     private int breaker_time = 0;
     private String breaker_color = "\247b";
-
-
+    private int pickaxe_durability = 100;
+    private String breaker_string = "\247e⚡ READY";
+    private String pickaxe_string = "\247b⛏";
+    private int time_pickaxe_display = 0;
     @Override
     public void onInitializeClient() {
         LOGGER.info("Mining Tracker Loaded!");
@@ -141,8 +150,8 @@ public class MiningTracker implements ClientModInitializer {
                     efficiency_level = client.player.getMainHandStack().getEnchantments().getCompound(j).getInt("lvl");
                 }
             }
-            if (efficiency_level >= 10){
-                if (!breaker_enabled){
+            if (efficiency_level >= 10) {
+                if (!breaker_enabled) {
                     breaker_time = breaker_length;
                 }
                 breaker_enabled = true;
@@ -158,6 +167,20 @@ public class MiningTracker implements ClientModInitializer {
             }
             if (breaker_time > 0){
                 breaker_time -= 1;
+            }
+            if (client.player != null && (client.player.getMainHandStack().getItem() == Items.NETHERITE_PICKAXE ||
+                    client.player.getMainHandStack().getItem() == Items.DIAMOND_PICKAXE ||
+                    client.player.getMainHandStack().getItem() == Items.IRON_PICKAXE ||
+                    client.player.getMainHandStack().getItem() == Items.STONE_PICKAXE ||
+                    client.player.getMainHandStack().getItem() == Items.GOLDEN_PICKAXE ||
+                    client.player.getMainHandStack().getItem() == Items.WOODEN_PICKAXE)) {
+                pickaxe_durability = (client.player.getMainHandStack().getMaxDamage() - client.player.getMainHandStack().getDamage()) * 100 / client.player.getMainHandStack().getMaxDamage();
+                if (pickaxe_durability<=5) {
+                    time_pickaxe_display = 40;
+                }
+            }
+            if (time_pickaxe_display > 0) {
+                time_pickaxe_display -= 1;
             }
 
             dia_per_minute_modded = 0;
@@ -187,13 +210,32 @@ public class MiningTracker implements ClientModInitializer {
             if (current_dia_count < start_dia_count) {
                 current_dia_count = start_dia_count;
             }
-            if (client.player != null && show_count && time_no_display <= 0 && timer % 10 == 0) {
-                if (breaker_time == 0 && !breaker_enabled){
-                    client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│\247e ⚡ READY \247"+marker_color+"│ \247b⛏ " + (current_dia_count - start_dia_count)), true);
-                }
-                else{
-                client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ "+breaker_color+"⚡ "+(breaker_time/20 + 1)+"s \247"+marker_color+"│ \247b⛏ " + (current_dia_count - start_dia_count)), true);
-                }
+            if (!breaker_enabled && breaker_time <= 0){
+                breaker_string = breaker_color +"⚡ READY";
+            }
+            else{
+                breaker_string = breaker_color + "⚡ "+(breaker_time/20 + 1)+"s";
+            }
+            if (pickaxe_durability <= 10){
+                pickaxe_string = "\247c\247l[⛏]";
+            }
+            else if (pickaxe_durability <= 20) {
+                pickaxe_string = "\247c⛏";
+            }
+            else if (pickaxe_durability <= 35){
+                pickaxe_string = "\247e⛏";
+            }
+            else if (pickaxe_durability <= 50){
+                pickaxe_string = "\247a⛏";
+            }
+            else{
+                pickaxe_string = "\247b⛏";
+            }
+            if (client.player != null && show_count && time_no_display <= 0 && timer % 10 == 0 && time_pickaxe_display <= 0) {
+                client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ "+breaker_string+"\247"+marker_color+"│ "+pickaxe_string+"\247b " + (current_dia_count - start_dia_count)), true);
+            }
+            else if (client.player != null &&show_count && time_no_display <= 0 && timer % 10 == 0 ) {
+                    client.player.sendMessage(new LiteralText("\247c\247l REPAIR YOUR PICKAXE!"),true);
             }
 
 
