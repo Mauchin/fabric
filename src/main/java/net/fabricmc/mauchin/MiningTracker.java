@@ -19,6 +19,8 @@ import org.lwjgl.glfw.GLFW;
 
 
 import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 
@@ -51,6 +53,12 @@ public class MiningTracker implements ClientModInitializer {
     private String breaker_string = "\247e⚡ READY";
     private String pickaxe_string = "\247b⛏";
     private int time_pickaxe_display = 0;
+    private int walking_speed = 0;
+    private boolean tp_detected = false;
+    private int max_position = -30000000;
+    private int mining_z = 0;
+    private int tp_detection_time = 0;
+    private List<Integer> previous_positions = new ArrayList<>();
     @Override
     public void onInitializeClient() {
         LOGGER.info("Mining Tracker Loaded!");
@@ -100,6 +108,8 @@ public class MiningTracker implements ClientModInitializer {
                     time_no_display = 20;
                     ticking = true;
                     has_been_reset = false;
+                    mining_z = client.player.getBlockZ();
+                    max_position = client.player.getBlockX();
                 } else if (!ticking) {
                     if (client.player != null) {
                         client.player.sendMessage(new LiteralText("Mining Tracker: \247aResumed"), true);
@@ -162,8 +172,11 @@ public class MiningTracker implements ClientModInitializer {
                 breaker_enabled = false;
                 breaker_time = breaker_cd;
             }
-            if (!breaker_enabled){
+            if (!breaker_enabled && breaker_time > 0){
                 breaker_color = "\247f";
+            }
+            else if (!breaker_enabled){
+                breaker_color = "\247e";
             }
             if (breaker_time > 0){
                 breaker_time -= 1;
@@ -231,13 +244,45 @@ public class MiningTracker implements ClientModInitializer {
             else{
                 pickaxe_string = "\247b⛏";
             }
+            //movement speed detect
+            if (client.player !=null && max_position <= client.player.getBlockX() && mining_z == client.player.getBlockZ() && ticking){
+                max_position = client.player.getBlockX();
+                tp_detected = false;
+                tp_detection_time = 0;
+            }
+            else if(client.player != null && ticking){
+                tp_detection_time += 1;
+            }
+            if (tp_detection_time >= 200){
+                tp_detected = true;
+            }
+            if (client.player != null && timer % 10 ==0){
+                if (tp_detection_time == 0){
+                    previous_positions.add(client.player.getBlockX());
+                    }
+                else {
+                    previous_positions.add(max_position);
+                }
+                if (previous_positions.size() >= 21) {
+                    previous_positions.remove(0);
+                walking_speed = (max_position - previous_positions.get(0)) * 6;
+                }
+            }
+
+
+
+
+
+            //show message
             if (client.player != null && show_count && time_no_display <= 0 && timer % 10 == 0 && time_pickaxe_display <= 0) {
-                client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min) + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute) + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ "+breaker_string+"\247"+marker_color+"│ "+pickaxe_string+"\247b " + (current_dia_count - start_dia_count)), true);
+                client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min)
+                        + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute)
+                        + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ "+breaker_string+"\247"+marker_color+"│ "
+                        +pickaxe_string+"\247b " + (current_dia_count - start_dia_count)+"\247" + marker_color + "│ \247f☄ "+walking_speed) , true);
             }
             else if (client.player != null &&show_count && time_no_display <= 0 && timer % 10 == 0 ) {
                     client.player.sendMessage(new LiteralText("\247c\247l REPAIR YOUR PICKAXE!"),true);
             }
-
 
         });
 
