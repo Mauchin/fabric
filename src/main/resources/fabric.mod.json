@@ -19,7 +19,10 @@
   "environment": "*",
   "entrypoints": {
     "client": [
-      "net.fabricmc.mauchin.MiningTracker"
+      "net.mauchin.mining_tracker.MiningTracker"
+    ],
+    "modmenu": [
+      "net.mauchin.mining_tracker.ModMenuIntegration"
     ]
   },
   "mixins": [

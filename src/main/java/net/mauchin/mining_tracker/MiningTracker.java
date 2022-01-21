@@ -1,8 +1,13 @@
-package net.fabricmc.mauchin;
+package net.mauchin.mining_tracker;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import me.shedaniel.autoconfig.AutoConfig;
+import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.mixin.client.rendering.MixinInGameHud;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawableHelper;
@@ -16,6 +21,7 @@ import net.minecraft.util.math.Matrix4f;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.glfw.GLFW;
+
 
 
 import java.text.DecimalFormat;
@@ -45,27 +51,29 @@ public class MiningTracker implements ClientModInitializer {
     private int time_no_click_detect = 0;
     private int efficiency_level = 0;
     private boolean breaker_enabled = false;
-    private final int breaker_length = 440;
-    private final int breaker_cd = 2380;
     private int breaker_time = 0;
     private String breaker_color = "\247b";
     private int pickaxe_durability = 100;
     private String breaker_string = "\247e⚡ READY";
     private String pickaxe_string = "\247b⛏";
     private int time_pickaxe_display = 0;
-    private int walking_speed = 0;
-    private boolean tp_detected = false;
-    private int max_position = -30000000;
-    private int mining_z = 0;
-    private int tp_detection_time = 0;
-    private List<Integer> previous_positions = new ArrayList<>();
+    private String home = "";
+    @SuppressWarnings("FieldMayBeFinal")
+    private List<String> homes_used = new ArrayList<>();
+    private String displayHome = "";
     @Override
     public void onInitializeClient() {
         LOGGER.info("Mining Tracker Loaded!");
+        ClientCommandManager.DISPATCHER.register(ClientCommandManager.literal("homemanager").then(ClientCommandManager.argument("name", StringArgumentType.word()).executes(context -> {
+                home = StringArgumentType.getString(context,"name");
+                return 1;
+            })));
+        AutoConfig.register(Config.class, GsonConfigSerializer::new);
         KeyBinding key_reset = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.mining_tracker.reset", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.mining_tracker.tracker"));
         KeyBinding key_toggle = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.mining_tracker.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.mining_tracker.tracker"));
         KeyBinding key_start = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.mining_tracker.start", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "category.mining_tracker.tracker"));
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
+            Config config = AutoConfig.getConfigHolder(Config.class).getConfig();
             while (key_toggle.wasPressed()) {
                 show_count = !show_count;
                 if (!show_count) {
@@ -108,8 +116,6 @@ public class MiningTracker implements ClientModInitializer {
                     time_no_display = 20;
                     ticking = true;
                     has_been_reset = false;
-                    mining_z = client.player.getBlockZ();
-                    max_position = client.player.getBlockX();
                 } else if (!ticking) {
                     if (client.player != null) {
                         client.player.sendMessage(new LiteralText("Mining Tracker: \247aResumed"), true);
@@ -162,15 +168,16 @@ public class MiningTracker implements ClientModInitializer {
             }
             if (efficiency_level >= 10) {
                 if (!breaker_enabled) {
-                    breaker_time = breaker_length;
+                    breaker_time = config.breakerLengthTicks;
                 }
                 breaker_enabled = true;
                 breaker_color = "\247b\247l";
 
             }
-            else if (breaker_enabled && breaker_time <= 0){
+            else if (breaker_enabled && breaker_time <= 0 && efficiency_level != 0){
                 breaker_enabled = false;
-                breaker_time = breaker_cd;
+                breaker_time = config.breakerCooldownTicks;
+                homes_used.clear();
             }
             if (!breaker_enabled && breaker_time > 0){
                 breaker_color = "\247f";
@@ -202,13 +209,13 @@ public class MiningTracker implements ClientModInitializer {
             if (ticking) {
                 dia_per_minute_modded = (current_dia_count - start_dia_count) * 120000 / time_passed;
                 dia_per_minute = dia_per_minute_modded / 100.0;
-                money_per_hour = dia_per_minute_modded * 252 / 1000;
-                if (money_per_hour>=400){speed_color ="\2479";}
-                else if (money_per_hour >= 375){speed_color = "\247b";}
-                else if (money_per_hour >= 350){speed_color = "\2472";}
-                else if (money_per_hour >= 325){speed_color = "\247a";}
-                else if (money_per_hour >= 300){speed_color = "\247e";}
-                else if (money_per_hour >= 275){speed_color = "\2476";}
+                money_per_hour = dia_per_minute_modded * config.pricePerDiamondOre * 6 / 10000;
+                if (money_per_hour>=config.optimalMoneyPerHour){speed_color ="\2479";}
+                else if (money_per_hour >= config.optimalMoneyPerHour - config.moneyPerHourStep){speed_color = "\247b";}
+                else if (money_per_hour >= config.optimalMoneyPerHour - config.moneyPerHourStep*2){speed_color = "\2472";}
+                else if (money_per_hour >= config.optimalMoneyPerHour - config.moneyPerHourStep*3){speed_color = "\247a";}
+                else if (money_per_hour >= config.optimalMoneyPerHour - config.moneyPerHourStep*4){speed_color = "\247e";}
+                else if (money_per_hour >= config.optimalMoneyPerHour - config.moneyPerHourStep*5){speed_color = "\2476";}
                 else {speed_color = "\247c";}
             }
             time_hour = time_passed / 72000;
@@ -229,6 +236,7 @@ public class MiningTracker implements ClientModInitializer {
             else{
                 breaker_string = breaker_color + "⚡ "+(breaker_time/20 + 1)+"s";
             }
+            //Pickaxe Durability Display
             if (pickaxe_durability <= 10){
                 pickaxe_string = "\247c\247l[⛏]";
             }
@@ -244,41 +252,32 @@ public class MiningTracker implements ClientModInitializer {
             else{
                 pickaxe_string = "\247b⛏";
             }
-            //movement speed detect
-            if (client.player !=null && max_position <= client.player.getBlockX() && mining_z == client.player.getBlockZ() && ticking){
-                max_position = client.player.getBlockX();
-                tp_detected = false;
-                tp_detection_time = 0;
-            }
-            else if(client.player != null && ticking){
-                tp_detection_time += 1;
-            }
-            if (tp_detection_time >= 200){
-                tp_detected = true;
-            }
-            if (client.player != null && timer % 10 ==0){
-                if (tp_detection_time == 0){
-                    previous_positions.add(client.player.getBlockX());
-                    }
-                else {
-                    previous_positions.add(max_position);
+            //home manager
+            displayHome = "";
+
+            for (String subhome : config.subhomes.split(",")){
+                if (Objects.equals(subhome.strip(), home) && !homes_used.contains(home)){
+                    homes_used.add(home);
                 }
-                if (previous_positions.size() >= 21) {
-                    previous_positions.remove(0);
-                walking_speed = (max_position - previous_positions.get(0)) * 6;
+                if (homes_used.contains(subhome) && !breaker_enabled){
+                    displayHome += " \2477" + subhome.strip();
                 }
+                else if (homes_used.contains(subhome) && breaker_enabled){
+                    displayHome += " \247b" + subhome.strip();
+                }
+                else if (!homes_used.contains(subhome) && breaker_enabled){
+                    displayHome += " \2477" + subhome.strip();
+                }
+                else{displayHome += " \247a" + subhome.strip();}
             }
-
-
-
-
+            home = "";
 
             //show message
             if (client.player != null && show_count && time_no_display <= 0 && timer % 10 == 0 && time_pickaxe_display <= 0) {
                 client.player.sendMessage(new LiteralText("\247f" + df_time.format(time_hour) + ":" + df_time.format(time_min)
                         + ":" + df_time.format(time_sec) + " ⌚ \247" + marker_color + "│ "+speed_color + df_speed.format(dia_per_minute)
                         + "\247f /min ("+speed_color+money_per_hour+"\247fk/hour) \247" + marker_color + "│ "+breaker_string+"\247"+marker_color+"│ "
-                        +pickaxe_string+"\247b " + (current_dia_count - start_dia_count)+"\247" + marker_color + "│ \247f☄ "+walking_speed) , true);
+                        +pickaxe_string+"\247b " + (current_dia_count - start_dia_count)+"\247" + marker_color + "│"+displayHome) , true);
             }
             else if (client.player != null &&show_count && time_no_display <= 0 && timer % 10 == 0 ) {
                     client.player.sendMessage(new LiteralText("\247c\247l REPAIR YOUR PICKAXE!"),true);
