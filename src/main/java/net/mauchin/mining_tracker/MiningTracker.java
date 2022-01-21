@@ -69,9 +69,9 @@ public class MiningTracker implements ClientModInitializer {
                 return 1;
             })));
         AutoConfig.register(Config.class, GsonConfigSerializer::new);
-        KeyBinding key_reset = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.mining_tracker.reset", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.mining_tracker.tracker"));
-        KeyBinding key_toggle = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.mining_tracker.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.mining_tracker.tracker"));
-        KeyBinding key_start = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.mining_tracker.start", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "category.mining_tracker.tracker"));
+        KeyBinding key_reset = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.reset", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "mining_tracker.category.tracker"));
+        KeyBinding key_toggle = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "mining_tracker.category.tracker"));
+        KeyBinding key_start = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.start", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "mining_tracker.category.tracker"));
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             Config config = AutoConfig.getConfigHolder(Config.class).getConfig();
             while (key_toggle.wasPressed()) {

@@ -1,0 +1,14 @@
+{
+  "text.autoconfig.MiningTracker.title": "Mining Tracker Config",
+  "text.autoconfig.MiningTracker.option.pricePerDiamondOre": "Price Per Diamond Ore",
+  "text.autoconfig.MiningTracker.option.optimalMoneyPerHour": "Optimal Money Per Hour",
+  "text.autoconfig.MiningTracker.option.moneyPerHourStep": "Money Pre Hour Step",
+  "text.autoconfig.MiningTracker.option.breakerCooldownTicks": "Super Breaker Cooldown (Ticks)",
+  "text.autoconfig.MiningTracker.option.breakerLengthTicks": "Super Breaker Activation Time (Ticks)",
+  "text.autoconfig.MiningTracker.option.subhomes": "Subhomes",
+  "text.autoconfig.MiningTracker.option.subhomes.@Tooltip": "Homes to be set when you find diamonds. Separate with comma (,).",
+  "mining_tracker.key.reset": "Reset Tracker",
+  "mining_tracker.key.start": "Start/Stop/Resume Tracker",
+  "mining_tracker.key.toggle": "Toggle Tracker Visibility",
+  "mining_tracker.category.tracker": "Mining Tracker"
+}
