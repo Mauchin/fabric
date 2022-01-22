@@ -65,7 +65,6 @@ public class MiningTracker implements ClientModInitializer {
     private boolean home_set = false;
     private BlockPos lastRunSethomeLocation = new BlockPos(0,0,0);
     private String lastSethomeName = "";
-    private String lastHomeName = "";
     @Override
     public void onInitializeClient() {
         LOGGER.info("Mining Tracker Loaded!");
@@ -168,11 +167,11 @@ public class MiningTracker implements ClientModInitializer {
 
             }
             while (key_home.wasPressed() && client.player != null){
-                homes_used.remove(lastHomeName);
+
                 if (!homes_used.isEmpty()){
                     client.player.sendChatMessage("/home "+homes_used.get(0).strip());
-                    lastHomeName = homes_used.get(0).strip();
                     client.player.sendMessage(new LiteralText("\2476Teleporting to subhome \247c"+homes_used.get(0).strip()+"\2476..."),false);
+                    homes_used.remove(0);
                 }
                 else{
                     client.player.sendChatMessage("/home "+config.mainhome.strip());
