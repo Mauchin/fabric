@@ -17,6 +17,7 @@ import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.LiteralText;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Matrix4f;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -61,6 +62,10 @@ public class MiningTracker implements ClientModInitializer {
     @SuppressWarnings("FieldMayBeFinal")
     private List<String> homes_used = new ArrayList<>();
     private String displayHome = "";
+    private boolean home_set = false;
+    private BlockPos lastRunSethomeLocation = new BlockPos(0,0,0);
+    private String lastSethomeName = "";
+    private String lastHomeName = "";
     @Override
     public void onInitializeClient() {
         LOGGER.info("Mining Tracker Loaded!");
@@ -72,6 +77,8 @@ public class MiningTracker implements ClientModInitializer {
         KeyBinding key_reset = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.reset", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "mining_tracker.category.tracker"));
         KeyBinding key_toggle = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "mining_tracker.category.tracker"));
         KeyBinding key_start = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.start", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "mining_tracker.category.tracker"));
+        KeyBinding key_sethome = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.sethome",InputUtil.Type.KEYSYM,GLFW.GLFW_KEY_B,"mining_tracker.category.tracker"));
+        KeyBinding key_home = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.home",InputUtil.Type.KEYSYM,GLFW.GLFW_KEY_H,"mining_tracker.category.tracker"));
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             Config config = AutoConfig.getConfigHolder(Config.class).getConfig();
             while (key_toggle.wasPressed()) {
@@ -130,6 +137,49 @@ public class MiningTracker implements ClientModInitializer {
                     time_no_display = 20;
                 }
             }
+            while (key_sethome.wasPressed() && client.player != null){
+                home_set = false;
+                if (client.player.getBlockPos().isWithinDistance(lastRunSethomeLocation,3.0)){
+                    client.player.sendChatMessage("/homemanager "+lastSethomeName.strip());
+                    client.player.sendChatMessage("/sethome "+lastSethomeName.strip());
+                    client.player.sendMessage(new LiteralText("\2476Rerun of sethome detected. Overriding latest sethome..."),false);
+                    client.player.sendMessage(new LiteralText("\2476Setting subhome \247c"+lastSethomeName.strip()+"\2476..."),false);
+                    home_set = true;
+                    lastRunSethomeLocation = client.player.getBlockPos();
+                }
+                else {
+                    for (String subhome : config.subhomes.split(",")) {
+                        if (!homes_used.contains(subhome.strip())) {
+                            client.player.sendChatMessage("/homemanager " + subhome.strip());
+                            client.player.sendChatMessage("/sethome " + subhome.strip());
+                            client.player.sendMessage(new LiteralText("\2476Setting subhome \247c" + subhome.strip()+"\2476..."), false);
+                            home_set = true;
+                            lastRunSethomeLocation = client.player.getBlockPos();
+                            lastSethomeName = subhome.strip();
+                            break;
+                        }
+                    }
+                }
+                if (!home_set){
+                    client.player.sendMessage(new LiteralText("\2476You don't have any more subhomes reserved."),false);
+                    client.player.sendMessage(new LiteralText("\2476Setting mainhome \247c"+config.mainhome+"\2476... \247aPrepare your super breaker!"),false);
+                }
+
+
+            }
+            while (key_home.wasPressed() && client.player != null){
+                homes_used.remove(lastHomeName);
+                if (!homes_used.isEmpty()){
+                    client.player.sendChatMessage("/home "+homes_used.get(0).strip());
+                    lastHomeName = homes_used.get(0).strip();
+                    client.player.sendMessage(new LiteralText("\2476Teleporting to subhome \247c"+homes_used.get(0).strip()+"\2476..."),false);
+                }
+                else{
+                    client.player.sendChatMessage("/home "+config.mainhome.strip());
+                    client.player.sendMessage(new LiteralText("\2476You don't have any more subhomes which has diamonds."),false);
+                    client.player.sendMessage(new LiteralText("\2476Teleporting to mainhome \247c"+config.mainhome+"\2476..."),false);
+                }
+            }
 
             if (ticking) {
                 time_passed += 1;
@@ -155,15 +205,17 @@ public class MiningTracker implements ClientModInitializer {
 
             }
             efficiency_level = 0;
-            for (int j = 0; j < 10; j++) {
-                if (client.player != null && efficiency_level == 0 && Objects.equals(client.player.getMainHandStack().getEnchantments().getCompound(j).getString("id"), "minecraft:efficiency")
-                    && (client.player.getMainHandStack().getItem() == Items.NETHERITE_PICKAXE||
-                        client.player.getMainHandStack().getItem() == Items.DIAMOND_PICKAXE||
-                        client.player.getMainHandStack().getItem() == Items.IRON_PICKAXE||
-                        client.player.getMainHandStack().getItem() == Items.STONE_PICKAXE||
-                        client.player.getMainHandStack().getItem() == Items.GOLDEN_PICKAXE||
-                        client.player.getMainHandStack().getItem() == Items.WOODEN_PICKAXE)) {
-                    efficiency_level = client.player.getMainHandStack().getEnchantments().getCompound(j).getInt("lvl");
+            for (int i = 0; i < 9; i++){
+                for (int j = 0; j < 10; j++) {
+                    if (client.player != null && efficiency_level == 0 && Objects.equals(client.player.getInventory().getStack(i).getEnchantments().getCompound(j).getString("id"), "minecraft:efficiency")
+                        && (client.player.getInventory().getStack(i).getItem() == Items.NETHERITE_PICKAXE||
+                            client.player.getInventory().getStack(i).getItem() == Items.DIAMOND_PICKAXE||
+                            client.player.getInventory().getStack(i).getItem() == Items.IRON_PICKAXE||
+                            client.player.getInventory().getStack(i).getItem() == Items.STONE_PICKAXE||
+                            client.player.getInventory().getStack(i).getItem() == Items.GOLDEN_PICKAXE||
+                            client.player.getInventory().getStack(i).getItem() == Items.WOODEN_PICKAXE)) {
+                        efficiency_level = client.player.getInventory().getStack(i).getEnchantments().getCompound(j).getInt("lvl");
+                    }
                 }
             }
             if (efficiency_level >= 10) {

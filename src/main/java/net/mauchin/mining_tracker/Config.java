@@ -10,6 +10,7 @@ public class Config implements ConfigData {
     int moneyPerHourStep = 25;
     int breakerCooldownTicks = 2380;
     int breakerLengthTicks = 440;
+    String mainhome = "w";
     @ConfigEntry.Gui.Tooltip
     String subhomes = "d,d1,d2";
 }
