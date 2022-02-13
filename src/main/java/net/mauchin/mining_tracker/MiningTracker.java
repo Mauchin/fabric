@@ -65,6 +65,7 @@ public class MiningTracker implements ClientModInitializer {
     private boolean home_set = false;
     private BlockPos lastRunSethomeLocation = new BlockPos(0,0,0);
     private String lastSethomeName = "";
+    private int sethomeMainCooldown = 0;
     @Override
     public void onInitializeClient() {
         LOGGER.info("Mining Tracker Loaded!");
@@ -76,7 +77,7 @@ public class MiningTracker implements ClientModInitializer {
         KeyBinding key_reset = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.reset", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "mining_tracker.category.tracker"));
         KeyBinding key_toggle = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "mining_tracker.category.tracker"));
         KeyBinding key_start = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.start", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "mining_tracker.category.tracker"));
-        KeyBinding key_sethome = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.sethome",InputUtil.Type.KEYSYM,GLFW.GLFW_KEY_B,"mining_tracker.category.tracker"));
+        KeyBinding key_mainhome = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.mainhome",InputUtil.Type.KEYSYM,GLFW.GLFW_KEY_B,"mining_tracker.category.tracker"));
         KeyBinding key_home = KeyBindingHelper.registerKeyBinding(new KeyBinding("mining_tracker.key.home",InputUtil.Type.KEYSYM,GLFW.GLFW_KEY_H,"mining_tracker.category.tracker"));
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             Config config = AutoConfig.getConfigHolder(Config.class).getConfig();
@@ -136,47 +137,70 @@ public class MiningTracker implements ClientModInitializer {
                     time_no_display = 20;
                 }
             }
-            while (key_sethome.wasPressed() && client.player != null){
-                home_set = false;
-                if (client.player.getBlockPos().isWithinDistance(lastRunSethomeLocation,3.0)){
-                    client.player.sendChatMessage("/homemanager "+lastSethomeName.strip());
-                    client.player.sendChatMessage("/sethome "+lastSethomeName.strip());
-                    client.player.sendMessage(new LiteralText("\2476Rerun of sethome detected. Overriding latest sethome..."),false);
-                    client.player.sendMessage(new LiteralText("\2476Setting subhome \247c"+lastSethomeName.strip()+"\2476..."),false);
-                    home_set = true;
-                    lastRunSethomeLocation = client.player.getBlockPos();
-                }
-                else {
-                    for (String subhome : config.subhomes.split(",")) {
-                        if (!homes_used.contains(subhome.strip())) {
-                            client.player.sendChatMessage("/homemanager " + subhome.strip());
-                            client.player.sendChatMessage("/sethome " + subhome.strip());
-                            client.player.sendMessage(new LiteralText("\2476Setting subhome \247c" + subhome.strip()+"\2476..."), false);
-                            home_set = true;
-                            lastRunSethomeLocation = client.player.getBlockPos();
-                            lastSethomeName = subhome.strip();
-                            break;
-                        }
-                    }
-                }
-                if (!home_set){
-                    client.player.sendMessage(new LiteralText("\2476You don't have any more subhomes reserved."),false);
-                    client.player.sendMessage(new LiteralText("\2476Setting mainhome \247c"+config.mainhome+"\2476... \247aPrepare your super breaker!"),false);
-                }
-
-
-            }
-            while (key_home.wasPressed() && client.player != null){
-
+            while (key_mainhome.wasPressed() && client.player != null){
                 if (!homes_used.isEmpty()){
+
                     client.player.sendChatMessage("/home "+homes_used.get(0).strip());
                     client.player.sendMessage(new LiteralText("\2476Teleporting to subhome \247c"+homes_used.get(0).strip()+"\2476..."),false);
+                    sethomeMainCooldown = 1;
                     homes_used.remove(0);
+
+
                 }
                 else{
-                    client.player.sendChatMessage("/home "+config.mainhome.strip());
-                    client.player.sendMessage(new LiteralText("\2476You don't have any more subhomes which has diamonds."),false);
-                    client.player.sendMessage(new LiteralText("\2476Teleporting to mainhome \247c"+config.mainhome+"\2476..."),false);
+                    client.player.sendMessage(new LiteralText("\2476You don't have any subhomes set!"),false);
+                }
+            }
+            if (sethomeMainCooldown >= config.setMainHomeCooldown && client.player != null){
+                client.player.sendChatMessage("/homemanager " + config.mainhome.strip());
+                client.player.sendChatMessage("/sethome " + config.mainhome.strip());
+                client.player.sendMessage(new LiteralText("\2476Setting mainhome \247c" + config.mainhome.strip()+"\2476..."), false);
+                sethomeMainCooldown = 0;
+            }
+            if (sethomeMainCooldown != 0){
+                sethomeMainCooldown += 1;
+            }
+
+            while (key_home.wasPressed() && client.player != null){
+                if (breaker_enabled || breaker_time <= 0){
+                    if (!homes_used.isEmpty()){
+                        client.player.sendChatMessage("/home "+homes_used.get(0).strip());
+                        client.player.sendMessage(new LiteralText("\2476Teleporting to subhome \247c"+homes_used.get(0).strip()+"\2476..."),false);
+                        homes_used.remove(0);
+                    }
+                    else{
+                        client.player.sendChatMessage("/home "+config.mainhome.strip());
+                        client.player.sendMessage(new LiteralText("\2476You don't have any more subhomes which has diamonds."),false);
+                        client.player.sendMessage(new LiteralText("\2476Teleporting to mainhome \247c"+config.mainhome+"\2476..."),false);
+                    }
+                }
+                else{
+                    home_set = false;
+                    if (client.player.getBlockPos().isWithinDistance(lastRunSethomeLocation,3.0)){
+                        client.player.sendChatMessage("/homemanager "+lastSethomeName.strip());
+                        client.player.sendChatMessage("/sethome "+lastSethomeName.strip());
+                        client.player.sendMessage(new LiteralText("\2476Rerun of sethome detected. Overriding latest sethome..."),false);
+                        client.player.sendMessage(new LiteralText("\2476Setting subhome \247c"+lastSethomeName.strip()+"\2476..."),false);
+                        home_set = true;
+                        lastRunSethomeLocation = client.player.getBlockPos();
+                    }
+                    else {
+                        for (String subhome : config.subhomes.split(",")) {
+                            if (!homes_used.contains(subhome.strip())) {
+                                client.player.sendChatMessage("/homemanager " + subhome.strip());
+                                client.player.sendChatMessage("/sethome " + subhome.strip());
+                                client.player.sendMessage(new LiteralText("\2476Setting subhome \247c" + subhome.strip()+"\2476..."), false);
+                                home_set = true;
+                                lastRunSethomeLocation = client.player.getBlockPos();
+                                lastSethomeName = subhome.strip();
+                                break;
+                            }
+                        }
+                    }
+                    if (!home_set){
+                        client.player.sendMessage(new LiteralText("\2476You don't have any more subhomes reserved."),false);
+                        client.player.sendMessage(new LiteralText("\2476Setting mainhome \247c"+config.mainhome+"\2476... \247aPrepare your super breaker!"),false);
+                    }
                 }
             }
 
@@ -228,7 +252,6 @@ public class MiningTracker implements ClientModInitializer {
             else if (breaker_enabled && breaker_time <= 0 && efficiency_level != 0){
                 breaker_enabled = false;
                 breaker_time = config.breakerCooldownTicks;
-                homes_used.clear();
             }
             if (!breaker_enabled && breaker_time > 0){
                 breaker_color = "\247f";
